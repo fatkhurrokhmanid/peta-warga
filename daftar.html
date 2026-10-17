@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Form Pendaftaran Warga Desa Segeran Kidul</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/4.6.2/css/bootstrap.min.css">
+<style>
+    body { background: #f0f4f8; padding: 20px; font-family: 'Segoe UI', sans-serif; }
+    .card-form { max-width: 500px; margin: auto; background:#fff; border-radius: 20px; padding: 25px; box-shadow: 0 8px 24px rgba(0,0,0,.1); }
+    h5 { color:#009cdc; font-weight:700; }
+    label { font-weight:600; font-size:13px; color:#333; }
+    .btn-submit { background:#009cdc; color:#fff; border-radius: 30px; font-weight: 700; }
+    .btn-submit:hover { background:#0088c4; color:#fff; }
+    #preview { width: 100%; max-height: 220px; object-fit: cover; border-radius: 12px; margin-top: 8px; display:none; }
+</style>
+</head>
+<body>
+
+<div class="card-form">
+    <h5 class="text-center mb-3"><i class="fa fa-user-plus"></i> Pendaftaran Warga Baru</h5>
+
+    <form id="form-warga">
+        <div class="form-group">
+            <label>Nama Lengkap *</label>
+            <input type="text" class="form-control" name="nama_lengkap" required>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group col-6">
+                <label>Blok *</label>
+                <input type="text" class="form-control" name="blok" placeholder="Contoh: A / Bedug" required>
+            </div>
+            <div class="form-group col-3">
+                <label>RT *</label>
+                <input type="text" class="form-control" name="rt" placeholder="001" required>
+            </div>
+            <div class="form-group col-3">
+                <label>RW *</label>
+                <input type="text" class="form-control" name="rw" placeholder="002" required>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group col-6">
+                <label>TPS *</label>
+                <input type="text" class="form-control" name="tps" placeholder="TPS 01" required>
+            </div>
+            <div class="form-group col-6">
+                <label>No HP *</label>
+                <input type="tel" class="form-control" name="no_hp" placeholder="08xxxxxxxxxx" required>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label>Foto Diri</label>
+            <input type="file" class="form-control-file" accept="image/*" id="foto-input">
+            <img id="preview">
+        </div>
+
+        <div class="form-group">
+            <label>Lokasi Rumah (Klik tombol di bawah) *</label>
+            <div id="mini-map" style="height:220px;border-radius:12px;margin-bottom:8px;"></div>
+            <button type="button" class="btn btn-sm btn-outline-primary btn-block rounded-pill"
+                    onclick="ambilLokasi()">
+                <i class="fa fa-crosshairs"></i> Ambil Lokasi Saat Ini
+            </button>
+            <input type="hidden" name="latitude" id="inp-lat">
+            <input type="hidden" name="longitude" id="inp-lng">
+            <small class="text-muted">Klik pada peta untuk memilih titik manual.</small>
+        </div>
+
+        <button type="submit" class="btn btn-submit btn-block mt-3" id="btn-submit">
+            <i class="fa fa-paper-plane"></i> Kirim Pendaftaran
+        </button>
+    </form>
+    <div id="msg" class="mt-3"></div>
+</div>
+
+<script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
+<link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet">
+
+<script>
+// GANTI DENGAN URL WEB APP ANDA
+const API_URL = "https://script.google.com/macros/s/AKfycbxLACfkiDvxp5ljiHK-cHIzJw7glGAKqP3w2oXF33CvKBJMjmId2bH35rmz8Eti1s3nXA/exec";
+
+// ==== MINI MAP UNTUK PILIH LOKASI ====
+const miniMap = new maplibregl.Map({
+    container: 'mini-map',
+    style: {
+        version: 8,
+        sources: {
+            'sat': {
+                type: 'raster',
+                tiles: ['https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}'],
+                tileSize: 256
+            }
+        },
+        layers: [{ id: 'sat', type: 'raster', source: 'sat' }]
+    },
+    center: [108.3958, -6.4682],
+    zoom: 16
+});
+
+let pickedMarker = null;
+miniMap.on('click', e => {
+    setLokasi(e.lngLat.lat, e.lngLat.lng);
+});
+function setLokasi(lat, lng) {
+    document.getElementById('inp-lat').value = lat;
+    document.getElementById('inp-lng').value = lng;
+    if (pickedMarker) pickedMarker.remove();
+    pickedMarker = new maplibregl.Marker({ color: '#e74c3c' })
+        .setLngLat([lng, lat])
+        .addTo(miniMap);
+}
+function ambilLokasi() {
+    if (!navigator.geolocation) return alert('Browser tidak mendukung GPS');
+    navigator.geolocation.getCurrentPosition(
+        pos => {
+            setLokasi(pos.coords.latitude, pos.coords.longitude);
+            miniMap.flyTo({ center: [pos.coords.longitude, pos.coords.latitude], zoom: 18 });
+        },
+        err => alert('Gagal ambil lokasi: ' + err.message)
+    );
+}
+
+// ==== PREVIEW FOTO ====
+let base64Foto = "", namaFoto = "";
+document.getElementById('foto-input').addEventListener('change', function (e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    namaFoto = file.name;
+    const reader = new FileReader();
+    reader.onload = ev => {
+        base64Foto = ev.target.result;
+        const img = document.getElementById('preview');
+        img.src = base64Foto;
+        img.style.display = 'block';
+    };
+    reader.readAsDataURL(file);
+});
+
+// ==== SUBMIT FORM ====
+document.getElementById('form-warga').addEventListener('submit', function (e) {
+    e.preventDefault();
+    const btn = document.getElementById('btn-submit');
+    const msg = document.getElementById('msg');
+
+    const lat = document.getElementById('inp-lat').value;
+    const lng = document.getElementById('inp-lng').value;
+    if (!lat || !lng) {
+        msg.innerHTML = '<div class="alert alert-warning">Silakan pilih lokasi di peta terlebih dahulu.</div>';
+        return;
+    }
+
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Mengirim...';
+
+    const fd = new FormData(this);
+    fd.append('action', 'create');
+    if (base64Foto) {
+        fd.append('photo_base64', base64Foto);
+        fd.append('photo_name', namaFoto);
+    }
+
+    fetch(API_URL, { method: 'POST', body: fd })
+        .then(r => r.json())
+        .then(res => {
+            if (res.status === 'success') {
+                msg.innerHTML = '<div class="alert alert-success">✅ Data berhasil dikirim! Terima kasih.</div>';
+                document.getElementById('form-warga').reset();
+                document.getElementById('preview').style.display = 'none';
+                if (pickedMarker) pickedMarker.remove();
+            } else {
+                msg.innerHTML = '<div class="alert alert-danger">❌ ' + (res.message || 'Gagal') + '</div>';
+            }
+        })
+        .catch(err => {
+            msg.innerHTML = '<div class="alert alert-danger">❌ ' + err.message + '</div>';
+        })
+        .finally(() => {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa fa-paper-plane"></i> Kirim Pendaftaran';
+        });
+});
+</script>
+
+</body>
+</html>
